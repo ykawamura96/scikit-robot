@@ -1,4 +1,5 @@
 import collections
+import contextlib
 import io
 import itertools
 from logging import getLogger
@@ -155,7 +156,8 @@ class Joint(object):
                  max_joint_velocity=None,
                  max_joint_torque=None,
                  joint_min_max_table=None,
-                 joint_min_max_target=None):
+                 joint_min_max_target=None,
+                 hooks=None):
         self.name = name
         self.parent_link = parent_link
         self.child_link = child_link
@@ -169,6 +171,16 @@ class Joint(object):
         self.joint_min_max_table = joint_min_max_table
         self.joint_min_max_target = joint_min_max_target
         self.default_coords = self.child_link.copy_coords()
+        self._hooks = hooks or []
+
+    @contextlib.contextmanager
+    def disable_hook(self):
+        hooks = self._hooks
+        self._hooks = []
+        try:
+            yield
+        finally:
+            self._hooks = hooks
 
     @property
     def joint_dof(self):
@@ -256,6 +268,8 @@ class RotationalJoint(Joint):
         self.child_link.rotation = self.default_coords.rotation.copy()
         self.child_link.translation = self.default_coords.translation.copy()
         self.child_link.rotate(self._joint_angle, self.axis)
+        for hook in self._hooks:
+            hook()
         return self._joint_angle
 
     @property
